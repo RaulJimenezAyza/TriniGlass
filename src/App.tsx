@@ -1,26 +1,19 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import Stock from './components/Stock'; // Tu tabla de Figma
 
-// Estos son componentes "falsos" temporales para que veas que la navegación funciona.
-// Más adelante crearás archivos separados para cada pantalla.
-const Inicio = () => (
+// Componentes temporales para rellenar las otras pantallas
+const Resumen = () => (
   <div>
-    <h1 className="text-2xl font-bold text-gray-800 mb-4">Bienvenido a TriniGlass</h1>
-    <p className="text-gray-600">Selecciona una opción en el menú lateral.</p>
+    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Panel de Control</h1>
+    <p className="text-slate-600 dark:text-slate-400">Aquí irán las tarjetas de resumen (Camiones en ruta, Tiempo medio, etc).</p>
   </div>
 );
 
-const Escaner = () => (
+const Alertas = () => (
   <div>
-    <h1 className="text-2xl font-bold text-gray-800 mb-4">Escáner QR</h1>
-    <p className="text-gray-600">Aquí irá la integración con html5-qrcode.</p>
-  </div>
-);
-
-const Configuracion = () => (
-  <div>
-    <h1 className="text-2xl font-bold text-gray-800 mb-4">Configuración</h1>
-    <p className="text-gray-600">Ajustes de la aplicación.</p>
+    <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-4">Alertas del Sistema</h1>
+    <p className="text-slate-600 dark:text-slate-400">Panel de notificaciones.</p>
   </div>
 );
 
@@ -28,11 +21,12 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* La ruta padre es el Layout. Todas las rutas hijas se renderizarán dentro de su <Outlet /> */}
         <Route path="/" element={<Layout />}>
-          <Route index element={<Inicio />} />
-          <Route path="scanner" element={<Escaner />} />
-          <Route path="settings" element={<Configuracion />} />
+          {/* Rutas conectadas con los enlaces de tu nuevo menú */}
+          <Route index element={<Resumen />} />
+          <Route path="inventario" element={<Stock />} />
+          <Route path="alertas" element={<Alertas />} />
+          <Route path="configuracion" element={<div className="text-slate-900 dark:text-white">Configuración general</div>} />
         </Route>
       </Routes>
     </BrowserRouter>

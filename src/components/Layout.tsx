@@ -1,28 +1,68 @@
-import { Outlet, Link } from 'react-router-dom';
-import { Home, Settings, Menu, QrCode } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink } from 'react-router-dom';
+import { LayoutDashboard, Package, Bell, Settings, Sun, Moon, Menu } from 'lucide-react';
 
 export default function Layout() {
+  // Estado para el modo oscuro (por defecto en true para que empiece como en Figma)
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  // Efecto que añade o quita la clase 'dark' al HTML cuando pulsamos el botón
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
+  const navItems = [
+    { to: "/", icon: LayoutDashboard, label: "Resumen", pill: null },
+    { to: "/inventario", icon: Package, label: "Inventario", pill: { text: "98", type: "grey" } },
+    { to: "/alertas", icon: Bell, label: "Alertas", pill: { text: "3", type: "red" } },
+    { to: "/configuracion", icon: Settings, label: "Configuración", pill: null },
+  ];
+
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-400 font-sans transition-colors duration-300">
       
-      {/* Sidebar Izquierdo (Oculto en móviles, visible en pantallas medianas/grandes) */}
-      <aside className="w-64 bg-slate-900 text-white flex-col hidden md:flex">
-        <div className="h-16 flex items-center justify-center border-b border-slate-700 font-bold text-xl">
-          TriniGlass
+      {/* Sidebar Izquierdo */}
+      <aside className="w-64 bg-white dark:bg-slate-950 flex flex-col hidden md:flex border-r border-slate-200 dark:border-slate-800 transition-colors duration-300">
+        <div className="h-16 flex items-center p-6 border-b border-slate-200 dark:border-slate-800">
+          <h1 className="text-slate-900 dark:text-white font-bold text-xl">Navas Fleet</h1>
         </div>
         <nav className="flex-1 p-4 space-y-2">
-          <Link to="/" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-            <Home size={20} />
-            Inicio
-          </Link>
-          <Link to="/scanner" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-            <QrCode size={20} />
-            Escáner QR
-          </Link>
-          <Link to="/settings" className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-            <Settings size={20} />
-            Configuración
-          </Link>
+          {navItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `flex items-center gap-3.5 p-3.5 rounded-xl transition-colors ${
+                  isActive 
+                    ? 'text-blue-700 bg-blue-50 dark:text-white dark:bg-blue-600/20' 
+                    : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <item.icon 
+                    size={20} 
+                    className={isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} 
+                  />
+                  <span className="flex-1">{item.label}</span>
+                  {item.pill && (
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                      item.pill.type === 'red' 
+                        ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300' 
+                        : 'bg-slate-200 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200'
+                    }`}>
+                      {item.pill.text}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          ))}
         </nav>
       </aside>
 
@@ -30,19 +70,30 @@ export default function Layout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         
         {/* Header Superior */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-          <button className="md:hidden text-gray-500 hover:text-gray-700">
+        <header className="h-16 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 transition-colors duration-300">
+          <button className="md:hidden text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
             <Menu size={24} />
           </button>
+          
           <div className="flex items-center gap-4 ml-auto">
-            <span className="text-sm font-medium text-gray-700">Usuario</span>
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+            
+            {/* Botón Mágico de Tema */}
+            <button 
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              title="Cambiar tema"
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Usuario</span>
+            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-blue-50 font-bold border-2 border-transparent dark:border-slate-800">
               U
             </div>
           </div>
         </header>
 
-        {/* Área dinámica: Aquí React Router inyectará las diferentes pantallas */}
+        {/* Área donde se renderizarán las vistas */}
         <main className="flex-1 overflow-auto p-6">
           <Outlet /> 
         </main>
