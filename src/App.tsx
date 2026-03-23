@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
-import Stock from './components/Stock'; // Tu tabla de Figma
+import Stock from './components/Stock'; 
 
 // Componentes temporales para rellenar las otras pantallas
 const Resumen = () => (
