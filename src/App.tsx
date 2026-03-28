@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Stock from './components/Stock'; 
+import Warehouse from './components/Warehouse';
 
 // Componentes temporales para rellenar las otras pantallas
 const Resumen = () => (
@@ -25,6 +26,7 @@ function App() {
           {/* Rutas conectadas con los enlaces de tu nuevo menú */}
           <Route index element={<Resumen />} />
           <Route path="inventario" element={<Stock />} />
+          <Route path="almacen" element={<Warehouse />} />
           <Route path="alertas" element={<Alertas />} />
           <Route path="configuracion" element={<div className="text-slate-900 dark:text-white">Configuración general</div>} />
         </Route>
