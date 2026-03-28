@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, Bell, Settings, Sun, Moon, Menu } from 'lucide-react';
+import { LayoutDashboard, Package, Building2, Bell, Settings, Sun, Moon, Menu } from 'lucide-react';
 
 export default function Layout() {
   // Estado para el modo oscuro (por defecto en true para que empiece como en Figma)
@@ -18,6 +18,7 @@ export default function Layout() {
   const navItems = [
     { to: "/", icon: LayoutDashboard, label: "Resumen", pill: null },
     { to: "/inventario", icon: Package, label: "Inventario", pill: { text: "98", type: "grey" } },
+    { to: "/almacen", icon: Building2, label: "Almacén", pill: null },
     { to: "/alertas", icon: Bell, label: "Alertas", pill: { text: "3", type: "red" } },
     { to: "/configuracion", icon: Settings, label: "Configuración", pill: null },
   ];
