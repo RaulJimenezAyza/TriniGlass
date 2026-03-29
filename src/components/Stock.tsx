@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
-import { Search, Filter, ArrowUpDown, Plus, Eye, MapPin, MoreVertical, X, Edit, Trash2 } from "lucide-react";
+import { Search, Filter, ArrowUpDown, Plus, Eye, MoreVertical, X, Edit, Trash2 } from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebase";
 
 interface Palet {
   id: string;
@@ -9,6 +11,16 @@ interface Palet {
   date: string; // Formato YYYY-MM-DD para poder filtrar bien
   location: string;
   status: string;
+  codigo_barra?: string;
+  codificador?: string;
+  numero_linea_pedido?: string;
+  descripcion_producido_longitud?: string;
+  referencia_linea_pedido?: string;
+  cantidad_encargada?: number;
+  cantidad_entregada?: number;
+  cantidad_producida?: number;
+  fecha_entrega?: string;
+  fecha_linea_pedido?: string;
 }
 
 export default function Stock() {
@@ -19,51 +31,68 @@ export default function Stock() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    client: "", type: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "",
-    thickness: "", status: "", dateFrom: "", dateTo: "", zone: "",
+    client: "", type: "", status: "", zone: "", codificador: "", codigo_barra: "", numero_linea_pedido: "", referencia_linea_pedido: "", dateFrom: "", dateTo: "",
   });
 
   // --- ESTADOS DEL PANEL LATERAL DE EDICIÓN ---
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [selectedPalet, setSelectedPalet] = useState<Palet | null>(null);
 
-  // SIMULACIÓN DE CONSULTA AL BaaS CON DATOS MEJORADOS
+  // --- ESTADOS DE PAGINADO ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // CARGAR STOCK DESDE FIREBASE FIRESTORE (`productos`)
   useEffect(() => {
+    const parseFirestoreDateToISO = (value: any) => {
+      if (!value) return "";
+      if (value instanceof Date) return value.toISOString().split("T")[0];
+      if (value?.toDate && typeof value.toDate === "function") {
+        return value.toDate().toISOString().split("T")[0];
+      }
+      if (typeof value === "string") {
+        return value.includes("/") ? value.split("/").reverse().join("-") : value;
+      }
+      return "";
+    };
+
     const fetchStock = async () => {
       setLoading(true);
       try {
-        setTimeout(() => {
-          const clients = ["Construcciones S.A.", "Reformas Integrales", "Cristalería Paco", "Aluminios del Sur", "Fachadas Modernas"];
-          const types = ["Vidrio Templado", "Vidrio Laminado 6+6", "Doble Acristalamiento", "Espejo Plata", "Vidrio Antireflejo"];
-          const zones = ["Zona A", "Zona B", "Zona C", "Zona D"];
-          const statuses = ["Almacenado", "Pendiente", "Reservado", "Listo para carga"];
-          const thicknesses = [4, 6, 8, 10, 12];
+        const querySnapshot = await getDocs(collection(db, "productos"));
+        console.log("Firestore: productos encontrados", querySnapshot.size);
 
-          const MOCK_INVENTORY = Array.from({ length: 40 }).map((_, i) => {
-            const width = Math.floor(Math.random() * 2000) + 1000; // Entre 1000 y 3000
-            const height = Math.floor(Math.random() * 1000) + 1000; // Entre 1000 y 2000
-            const thickness = thicknesses[i % thicknesses.length];
-            
-            // Generar fecha en formato YYYY-MM-DD para poder comparar
-            const dateObj = new Date(Date.now() - Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000);
-            const isoDate = dateObj.toISOString().split('T')[0];
+        const firestoreInventory: Palet[] = querySnapshot.docs.map((doc) => {
+          const data = doc.data() as any;
 
-            return {
-              id: `PAL-${8000 + i}`,
-              type: types[i % types.length],
-              dimensions: `${width}x${height}x${thickness}`,
-              client: clients[i % clients.length],
-              date: isoDate,
-              location: `${zones[i % zones.length]} - Pasillo ${Math.floor(i/10) + 1}`,
-              status: statuses[i % statuses.length],
-            };
-          });
+          const dateValue = data.fecha_entrega || data.fecha_linea_pedido || data.infos_entrega || "";
+          const dateString = parseFirestoreDateToISO(dateValue);
 
-          setInventory(MOCK_INVENTORY);
-          setLoading(false);
-        }, 800);
+          const altura = Number(data.altura ?? 0);
+          const ancho = Number(data.longitud ?? 0);
+          const alto = Number(data.altura ?? 0);
+          const grosor = Number(data.peso_pieza_kg ?? 0);
+
+          const locationValue = data.numero_caballete ? `Caballete ${data.numero_caballete}` : (data.referencia_linea_pedido || "Sin ubicación");
+          const estado = data.estado_pedido || data.estado_linea_pdd || "Pendiente";
+
+          return {
+            id: data.numero_linea_pedido || doc.id,
+            type: data.descripcion_producido_longitud || data.estado_linea_pdd || "Sin descripción",
+            dimensions: `${ancho || altura || 0}x${alto || 0}x${grosor || 0}`,
+            client: data.apellido_cliente || data.nombre_abreviado || "Cliente desconocido",
+            date: dateString,
+            location: locationValue,
+            status: estado,
+          };
+        });
+
+        console.log("Inventario normalizado", firestoreInventory.slice(0, 4));
+        setInventory(firestoreInventory);
       } catch (error) {
-        console.error("Error cargando inventario:", error);
+        console.error("Error cargando inventario desde Firestore:", error);
+        setInventory([]);
+      } finally {
         setLoading(false);
       }
     };
@@ -77,41 +106,60 @@ export default function Stock() {
 
   const clearFilters = () => {
     setFilters({
-      client: "", type: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "",
-      thickness: "", status: "", dateFrom: "", dateTo: "", zone: "",
+      client: "", type: "", status: "", zone: "", codificador: "", codigo_barra: "", numero_linea_pedido: "", referencia_linea_pedido: "", dateFrom: "", dateTo: "",
     });
     setSearchTerm("");
-  };
-
-  const parseDimensions = (dimensions: string) => {
-    const [width, height, thickness] = dimensions.split("x").map(Number);
-    return { width: width || 0, height: height || 0, thickness: thickness || 0 };
   };
 
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
       const search = searchTerm.toLowerCase().trim();
-      const matchesSearch = item.id.toLowerCase().includes(search) || item.client.toLowerCase().includes(search) || item.type.toLowerCase().includes(search);
+      const matchesSearch =
+        item.id.toLowerCase().includes(search) ||
+        item.client.toLowerCase().includes(search) ||
+        item.type.toLowerCase().includes(search) ||
+        (item.codigo_barra?.toLowerCase().includes(search) ?? false) ||
+        (item.codificador?.toLowerCase().includes(search) ?? false) ||
+        (item.numero_linea_pedido?.toLowerCase().includes(search) ?? false);
+
       const matchesClient = item.client.toLowerCase().includes(filters.client.toLowerCase());
       const matchesType = item.type.toLowerCase().includes(filters.type.toLowerCase());
       const matchesStatus = filters.status === "" || item.status === filters.status;
       const matchesZone = item.location.toLowerCase().includes(filters.zone.toLowerCase());
-      
-      const { width, height, thickness } = parseDimensions(item.dimensions);
-      const matchesWidthMin = filters.widthMin === "" || width >= Number(filters.widthMin);
-      const matchesWidthMax = filters.widthMax === "" || width <= Number(filters.widthMax);
-      const matchesHeightMin = filters.heightMin === "" || height >= Number(filters.heightMin);
-      const matchesHeightMax = filters.heightMax === "" || height <= Number(filters.heightMax);
-      const matchesThickness = filters.thickness === "" || thickness === Number(filters.thickness);
-
+      const matchesCodificador = item.codificador?.toLowerCase().includes(filters.codificador.toLowerCase()) ?? true;
+      const matchesCodigoBarra = item.codigo_barra?.toLowerCase().includes(filters.codigo_barra.toLowerCase()) ?? true;
+      const matchesPedido = item.numero_linea_pedido?.toLowerCase().includes(filters.numero_linea_pedido.toLowerCase()) ?? true;
+      const matchesReferencia = item.referencia_linea_pedido?.toLowerCase().includes(filters.referencia_linea_pedido.toLowerCase()) ?? true;
       const matchesDateFrom = filters.dateFrom === "" || item.date >= filters.dateFrom;
       const matchesDateTo = filters.dateTo === "" || item.date <= filters.dateTo;
 
-      return matchesSearch && matchesClient && matchesType && matchesStatus && matchesZone && 
-             matchesWidthMin && matchesWidthMax && matchesHeightMin && matchesHeightMax && 
-             matchesThickness && matchesDateFrom && matchesDateTo;
+      return matchesSearch && matchesClient && matchesType && matchesStatus && matchesZone && matchesCodificador && matchesCodigoBarra && matchesPedido && matchesReferencia && matchesDateFrom && matchesDateTo;
     });
   }, [searchTerm, filters, inventory]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredInventory.length / rowsPerPage));
+
+  const statusOptions = useMemo(() => {
+    const statuses = new Set<string>();
+    inventory.forEach((item) => {
+      if (item.status?.trim()) statuses.add(item.status.trim());
+    });
+
+    if (statuses.size === 0) {
+      ["Pendiente", "Almacenado", "Reservado", "Listo para carga"].forEach((status) => statuses.add(status));
+    }
+
+    return [...statuses].sort();
+  }, [inventory]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredInventory, rowsPerPage]);
+
+  const paginatedInventory = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredInventory.slice(start, start + rowsPerPage);
+  }, [filteredInventory, currentPage, rowsPerPage]);
 
   // Formatear fecha a prueba de fallos
   const formatDateForDisplay = (dateString: string) => {
@@ -189,10 +237,9 @@ export default function Stock() {
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Estado</label>
                 <select value={filters.status} onChange={(e) => updateFilter("status", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none">
                   <option value="">Todos los estados</option>
-                  <option value="Pendiente">Pendiente</option>
-                  <option value="Almacenado">Almacenado</option>
-                  <option value="Reservado">Reservado</option>
-                  <option value="Listo para carga">Listo para carga</option>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>{status}</option>
+                  ))}
                 </select>
               </div>
 
@@ -208,24 +255,23 @@ export default function Stock() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Ancho (mm)</label>
-                <div className="flex gap-2">
-                  <input type="number" placeholder="Min" value={filters.widthMin} onChange={(e) => updateFilter("widthMin", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
-                  <input type="number" placeholder="Max" value={filters.widthMax} onChange={(e) => updateFilter("widthMax", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
-                </div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Codificador</label>
+                <input type="text" placeholder="Ej. AITOR" value={filters.codificador} onChange={(e) => updateFilter("codificador", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Alto (mm)</label>
-                <div className="flex gap-2">
-                  <input type="number" placeholder="Min" value={filters.heightMin} onChange={(e) => updateFilter("heightMin", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
-                  <input type="number" placeholder="Max" value={filters.heightMax} onChange={(e) => updateFilter("heightMax", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
-                </div>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Código de barra</label>
+                <input type="text" placeholder="Ej. *A/351240/PV*" value={filters.codigo_barra} onChange={(e) => updateFilter("codigo_barra", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Grosor (mm)</label>
-                <input type="number" placeholder="Ej. 8" value={filters.thickness} onChange={(e) => updateFilter("thickness", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Número línea pedido</label>
+                <input type="text" placeholder="Ej. 2026-404587-045" value={filters.numero_linea_pedido} onChange={(e) => updateFilter("numero_linea_pedido", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Referencia pedido</label>
+                <input type="text" placeholder="Ej. ALUTEC DELTA SLU" value={filters.referencia_linea_pedido} onChange={(e) => updateFilter("referencia_linea_pedido", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:ring-2 focus:ring-blue-500 dark:text-slate-200 outline-none" />
               </div>
 
               <div className="space-y-1.5">
@@ -264,8 +310,8 @@ export default function Stock() {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {loading ? (
                 <tr><td colSpan={7} className="p-10 text-center text-slate-500">Cargando datos del inventario...</td></tr>
-              ) : filteredInventory.length > 0 ? (
-                filteredInventory.map((item) => (
+              ) : paginatedInventory.length > 0 ? (
+                paginatedInventory.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="p-4 font-medium text-slate-900 dark:text-white">{item.id}</td>
                     <td className="p-4">
@@ -324,11 +370,27 @@ export default function Stock() {
         </div>
 
         {/* PIE DE TABLA */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50">
-          <span>Mostrando {filteredInventory.length} resultado{filteredInventory.length !== 1 && 's'}</span>
-          <div className="flex gap-2">
-            <button className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors disabled:opacity-50">Anterior</button>
-            <button className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors">Siguiente</button>
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50">
+          <div className="flex items-center gap-3">
+            <span>Mostrando {Math.min(filteredInventory.length, rowsPerPage)} de {filteredInventory.length} resultado{filteredInventory.length !== 1 && 's'}</span>
+            <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              Filas por página:
+              <select value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))} className="rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-xs focus:outline-none">
+                {[5,10,15,20,50].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))} disabled={currentPage === 1} className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors disabled:opacity-50">
+              Anterior
+            </button>
+            <span className="px-2">Página {currentPage} de {totalPages}</span>
+            <button onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors disabled:opacity-50">
+              Siguiente
+            </button>
           </div>
         </div>
       </div>
